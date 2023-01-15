@@ -12,12 +12,18 @@ import javax.servlet.http.HttpServletRequest;
  */
 public interface UserService extends IService<User> {
 
+
+    /**
+     * 用户登录态
+     */
+    String SESSION_KEY = "USER_LOGIN_STATE";
+
     /**
      * 用户注册
      *
-     * @param userAccount  用户账号
-     * @param userPassword 用户密码
-     * @param checkPassword    校验码
+     * @param userAccount   用户账号
+     * @param userPassword  用户密码
+     * @param checkPassword 校验码
      * @return 用户ID
      */
     long userRegister(String userAccount, String userPassword, String checkPassword);
@@ -31,4 +37,12 @@ public interface UserService extends IService<User> {
      * @return 用户信息
      */
     User userLogin(String userAccount, String userPassword, HttpServletRequest request);
+
+    /**
+     * 用户脱敏
+     *
+     * @param user 用户信息
+     * @return User
+     */
+    User safetyUser(User user);
 }

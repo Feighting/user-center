@@ -2,6 +2,7 @@ package com.example.usercenter.service.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.usercenter.constant.UserConstant;
 import com.example.usercenter.mapper.UserMapper;
 import com.example.usercenter.model.domain.User;
 import com.example.usercenter.service.service.UserService;
@@ -26,15 +27,6 @@ import java.util.regex.Pattern;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         implements UserService {
 
-    /**
-     * 盐值
-     */
-    public static final String SALT = "yupi";
-
-    /**
-     * 正则表达式（校验特殊字符）
-     */
-    public static final String regEx = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
 
     @Resource
     private UserMapper userMapper;
@@ -55,7 +47,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return -1;
         }
         //4. 账户不包含特殊字符（正则表达式）
-        Matcher matcher = Pattern.compile(regEx).matcher(userAccount);
+        Matcher matcher = Pattern.compile(UserConstant.regEx).matcher(userAccount);
         if (matcher.find()) {
             //匹配到特殊字符返回-1
             return -1;
@@ -72,7 +64,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return -1;
         }
         //7. 对密码进行加密（密码千万不要直接以明文存储到数据库中）
-        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes(StandardCharsets.UTF_8));
+        String encryptPassword = DigestUtils.md5DigestAsHex((UserConstant.SALT + userPassword).getBytes(StandardCharsets.UTF_8));
         //8. 向数据库插入用户数据
         User user = new User();
         user.setUserAccount(userAccount);
@@ -100,12 +92,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return null;
         }
         //账户不包含特殊字符
-        Matcher matcher = Pattern.compile(regEx).matcher(userAccount);
+        Matcher matcher = Pattern.compile(UserConstant.regEx).matcher(userAccount);
         if (matcher.find()) {
             return null;
         }
         //校验密码是否输入正确，要和数据库中的密文密码去对比
-        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes(StandardCharsets.UTF_8));
+        String encryptPassword = DigestUtils.md5DigestAsHex((UserConstant.SALT + userPassword).getBytes(StandardCharsets.UTF_8));
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.eq("userAccount", userAccount);
         wrapper.eq("userPassword", encryptPassword);
@@ -115,19 +107,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return null;
         }
         //3. 用户信息脱敏，隐藏敏感信息，防止数据库中的字段泄露
+        User safetyUser = safetyUser(user);
+        //4. 我们要记录用户的登录态（session），将其存到服务器上（用后端 SpringBoot 框架封装的服务器 tomcat 去记录）
+        request.getSession().setAttribute(SESSION_KEY, safetyUser);
+        //5. 返回脱敏后的用户信息
+        return safetyUser;
+    }
+
+    /**
+     * 用户脱敏
+     *
+     * @param user
+     * @return
+     */
+    @Override
+    public User safetyUser(User user) {
         User safetyUser = new User();
         safetyUser.setId(user.getId());
         safetyUser.setUsername(user.getUsername());
         safetyUser.setUserAccount(user.getUserAccount());
         safetyUser.setGender(user.getGender());
         safetyUser.setPhoneNumber(user.getPhoneNumber());
+        safetyUser.setUserRole(user.getUserRole());
         safetyUser.setEmail(user.getEmail());
         safetyUser.setAvatarUrl(user.getAvatarUrl());
         safetyUser.setUserStatus(user.getUserStatus());
         safetyUser.setCreateTime(user.getCreateTime());
-        //4. 我们要记录用户的登录态（session），将其存到服务器上（用后端 SpringBoot 框架封装的服务器 tomcat 去记录）
-        request.getSession().setAttribute("user", safetyUser);
-        //5. 返回脱敏后的用户信息
         return safetyUser;
     }
 }

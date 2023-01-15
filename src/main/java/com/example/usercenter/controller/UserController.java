@@ -1,17 +1,19 @@
 package com.example.usercenter.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.example.usercenter.constant.UserConstant;
 import com.example.usercenter.model.domain.User;
 import com.example.usercenter.model.domain.request.UserLoginRequest;
 import com.example.usercenter.model.domain.request.UserRegisterRequest;
 import com.example.usercenter.service.service.UserService;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @ClassName: UserController
@@ -32,7 +34,7 @@ public class UserController {
      * @param userRegisterRequest 封装的参数
      * @return 用户ID
      */
-    @PostMapping("/userRegister")
+    @PostMapping("/register")
     public Long userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
         //校验参数是否为空
         if (userRegisterRequest == null) {
@@ -54,7 +56,7 @@ public class UserController {
      * @param request          请求对象
      * @return 脱敏的用户信息
      */
-    @PostMapping("/userLogin")
+    @PostMapping("/login")
     public User userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) {
             return null;
@@ -65,5 +67,51 @@ public class UserController {
             return null;
         }
         return userService.userLogin(userAccount, userPassword, request);
+    }
+
+    /**
+     * 用户查询
+     *
+     * @param username 用户名
+     * @param request  登录态
+     * @return User
+     */
+    @GetMapping("/search")
+    public List<User> searchUser(String username, HttpServletRequest request) {
+        //1、鉴权（仅管理员可操作）
+        if (!isAdmin(request)) {
+            return new ArrayList<>();
+        }
+        QueryWrapper<User> wrapper = new QueryWrapper<>();
+        if (StringUtils.isNotBlank(username)) {
+            //like->如果username不为空，模糊查询；为空，查询全部
+            wrapper.like("username", username);
+        }
+        List<User> userList = userService.list(wrapper);
+        //返回脱敏用户
+        return userList.stream().map(user -> userService.safetyUser(user)).collect(Collectors.toList());
+    }
+
+    @PostMapping("/delete")
+    public boolean deleteUser(@RequestBody User user, HttpServletRequest request) {
+        //1、鉴权（仅管理员可操作）
+        if (!isAdmin(request)) {
+            return false;
+        }
+        if (user.getId() <= 0) {
+            return false;
+        }
+        return userService.removeById(user.getId());
+    }
+
+    /**
+     * 是否为管理员
+     *
+     * @param request 登录态
+     * @return boolean
+     */
+    public boolean isAdmin(HttpServletRequest request) {
+        User user = (User) request.getSession().getAttribute(UserService.SESSION_KEY);
+        return user != null && user.getUserRole() == UserConstant.ADMIN_USER;
     }
 }

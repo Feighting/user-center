@@ -36,14 +36,19 @@ public class User implements Serializable {
     private String userPassword;
 
     /**
-     * 性别
-     */
-    private Integer gender;
-
-    /**
      * 手机号
      */
     private String phoneNumber;
+
+    /**
+     * 用户角色 0-普通用户 1-管理员
+     */
+    private Integer userRole;
+
+    /**
+     * 性别
+     */
+    private Integer gender;
 
     /**
      * 邮箱

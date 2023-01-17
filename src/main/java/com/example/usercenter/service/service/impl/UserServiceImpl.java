@@ -53,7 +53,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return -1;
         }
         //5. 密码和校验密码相同
-        if (userAccount.equals(checkPassword)) {
+        if (!userPassword.equals(checkPassword)) {
             return -1;
         }
         //6. 账户不能重复（需要操作数据库的放在最后校验）
@@ -122,6 +122,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public User safetyUser(User user) {
+        if (user == null) {
+            return null;
+        }
         User safetyUser = new User();
         safetyUser.setId(user.getId());
         safetyUser.setUsername(user.getUsername());

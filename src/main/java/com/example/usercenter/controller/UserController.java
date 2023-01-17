@@ -69,6 +69,26 @@ public class UserController {
         return userService.userLogin(userAccount, userPassword, request);
     }
 
+
+    /**
+     * 获取用户的登录态（用于前端判断用户是否已经登录过）
+     *
+     * @param request 请求对象
+     * @return 脱敏User
+     */
+    @GetMapping("/current")
+    public User current(HttpServletRequest request) {
+        Object objUser = request.getSession().getAttribute(UserService.SESSION_KEY);
+        User currentUser = (User) objUser;
+        if (currentUser == null) {
+            return null;
+        }
+        long userId = currentUser.getId();
+        //TODO getById()需要校验用户是否合法（用户状态是否正常未被封号）
+        User user = userService.getById(userId);
+        return userService.safetyUser(user);
+    }
+
     /**
      * 用户查询
      *

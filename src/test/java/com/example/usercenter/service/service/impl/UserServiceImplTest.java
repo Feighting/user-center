@@ -45,7 +45,7 @@ public class UserServiceImplTest {
      */
     @Test
     public void userRegister() {
-        long result = userService.userRegister("yupi", "1234", "1234");
+        long result = userService.userRegister("yupi", "1234", "1234","1");
         Assert.assertEquals(3, result);
         System.out.println(result);
     }

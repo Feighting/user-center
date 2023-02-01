@@ -1,17 +1,20 @@
 package com.example.usercenter.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.example.usercenter.common.BaseResponse;
+import com.example.usercenter.common.ErrorCodeEnum;
 import com.example.usercenter.constant.UserConstant;
+import com.example.usercenter.exception.BusinessException;
 import com.example.usercenter.model.domain.User;
 import com.example.usercenter.model.domain.request.UserLoginRequest;
 import com.example.usercenter.model.domain.request.UserRegisterRequest;
 import com.example.usercenter.service.service.UserService;
+import com.example.usercenter.common.ResultUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,18 +38,20 @@ public class UserController {
      * @return 用户ID
      */
     @PostMapping("/register")
-    public Long userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
+    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
         //校验参数是否为空
         if (userRegisterRequest == null) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         String userAccount = userRegisterRequest.getUserAccount();
         String userPassword = userRegisterRequest.getUserPassword();
         String checkPassword = userRegisterRequest.getCheckPassword();
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
+        String planetCode = userRegisterRequest.getPlanetCode();
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
             return null;
         }
-        return userService.userRegister(userAccount, userPassword, checkPassword);
+        long result = userService.userRegister(userAccount, userPassword, checkPassword, planetCode);
+        return ResultUtils.success(result);
     }
 
     /**
@@ -57,16 +62,32 @@ public class UserController {
      * @return 脱敏的用户信息
      */
     @PostMapping("/login")
-    public User userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
+    public BaseResponse<User> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         String userAccount = userLoginRequest.getUserAccount();
         String userPassword = userLoginRequest.getUserPassword();
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
-        return userService.userLogin(userAccount, userPassword, request);
+        User user = userService.userLogin(userAccount, userPassword, request);
+        return ResultUtils.success(user);
+    }
+
+    /**
+     * 用户注销
+     *
+     * @param request 请求对象
+     * @return
+     */
+    @PostMapping("/logout")
+    public BaseResponse<Integer> userLogout(HttpServletRequest request) {
+        if (request == null) {
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
+        }
+        int result = userService.userLogout(request);
+        return ResultUtils.success(result);
     }
 
 
@@ -77,16 +98,17 @@ public class UserController {
      * @return 脱敏User
      */
     @GetMapping("/current")
-    public User current(HttpServletRequest request) {
+    public BaseResponse<User> current(HttpServletRequest request) {
         Object objUser = request.getSession().getAttribute(UserService.SESSION_KEY);
         User currentUser = (User) objUser;
         if (currentUser == null) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.NO_LOGIN);
         }
         long userId = currentUser.getId();
         //TODO getById()需要校验用户是否合法（用户状态是否正常未被封号）
         User user = userService.getById(userId);
-        return userService.safetyUser(user);
+        User safetyUser = userService.safetyUser(user);
+        return ResultUtils.success(safetyUser);
     }
 
     /**
@@ -97,10 +119,10 @@ public class UserController {
      * @return User
      */
     @GetMapping("/search")
-    public List<User> searchUser(String username, HttpServletRequest request) {
+    public BaseResponse<List<User>> searchUser(String username, HttpServletRequest request) {
         //1、鉴权（仅管理员可操作）
         if (!isAdmin(request)) {
-            return new ArrayList<>();
+            throw new BusinessException(ErrorCodeEnum.NO_AUTH);
         }
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         if (StringUtils.isNotBlank(username)) {
@@ -109,19 +131,21 @@ public class UserController {
         }
         List<User> userList = userService.list(wrapper);
         //返回脱敏用户
-        return userList.stream().map(user -> userService.safetyUser(user)).collect(Collectors.toList());
+        List<User> resultList = userList.stream().map(user -> userService.safetyUser(user)).collect(Collectors.toList());
+        return ResultUtils.success(resultList);
     }
 
     @PostMapping("/delete")
-    public boolean deleteUser(@RequestBody User user, HttpServletRequest request) {
+    public BaseResponse<Boolean> deleteUser(@RequestBody User user, HttpServletRequest request) {
         //1、鉴权（仅管理员可操作）
         if (!isAdmin(request)) {
-            return false;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         if (user.getId() <= 0) {
-            return false;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
-        return userService.removeById(user.getId());
+        boolean result = userService.removeById(user.getId());
+        return ResultUtils.success(result);
     }
 
     /**

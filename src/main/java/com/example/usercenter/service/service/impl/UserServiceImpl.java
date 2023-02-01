@@ -2,7 +2,9 @@ package com.example.usercenter.service.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.usercenter.common.ErrorCodeEnum;
 import com.example.usercenter.constant.UserConstant;
+import com.example.usercenter.exception.BusinessException;
 import com.example.usercenter.mapper.UserMapper;
 import com.example.usercenter.model.domain.User;
 import com.example.usercenter.service.service.UserService;
@@ -32,36 +34,47 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     private UserMapper userMapper;
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode) {
         //校验用户的账户、密码、校验密码，是否符合要求
         //1. 非空（引入依赖）
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
-            return -1;
+        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword, planetCode)) {
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "数据为空");
         }
         //2. 账户长度 **不小于** 4 位
         if (userAccount.length() < 4) {
-            return -1;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "账户长度过短");
         }
         //3. 密码 **不小于** 8 位
         if (userPassword.length() < 8) {
-            return -1;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "密码长度过短");
+        }
+        //星球编号长度小于5
+        if (planetCode.length() > 5) {
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "星球编号长度过长");
         }
         //4. 账户不包含特殊字符（正则表达式）
-        Matcher matcher = Pattern.compile(UserConstant.regEx).matcher(userAccount);
+        Matcher matcher = Pattern.compile(UserConstant.REGEX).matcher(userAccount);
         if (matcher.find()) {
             //匹配到特殊字符返回-1
-            return -1;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "账号包含特殊字符");
         }
         //5. 密码和校验密码相同
         if (!userPassword.equals(checkPassword)) {
-            return -1;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "密码不一致");
         }
         //6. 账户不能重复（需要操作数据库的放在最后校验）
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.eq("userAccount", userAccount);
-        Long count = userMapper.selectCount(wrapper);
-        if (count > 0) {
-            return -1;
+        Long userAccountCount = userMapper.selectCount(wrapper);
+        if (userAccountCount > 0) {
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "账号已存在");
+        }
+        //星球编号不能重复（需要操作数据库的放在最后校验）
+        wrapper = new QueryWrapper<User>();
+        wrapper.eq("planetCode", planetCode);
+        Long planetCodeCount = userMapper.selectCount(wrapper);
+        if (planetCodeCount > 0) {
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR, "星球编号已存在");
         }
         //7. 对密码进行加密（密码千万不要直接以明文存储到数据库中）
         String encryptPassword = DigestUtils.md5DigestAsHex((UserConstant.SALT + userPassword).getBytes(StandardCharsets.UTF_8));
@@ -69,9 +82,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User user = new User();
         user.setUserAccount(userAccount);
         user.setUserPassword(encryptPassword);
+        user.setPlanetCode(planetCode);
         boolean resultSave = this.save(user);
         if (!resultSave) {
-            return -1;
+            throw new BusinessException(ErrorCodeEnum.INSERT_ERROR);
         }
         return user.getId();
     }
@@ -81,20 +95,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         //1. 校验用户账户和密码是否合法
         //非空
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         //账户长度 **不小于** 4 位
         if (userAccount.length() < 4) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         //密码就 **不小于** 8 位吧
         if (userPassword.length() < 8) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         //账户不包含特殊字符
-        Matcher matcher = Pattern.compile(UserConstant.regEx).matcher(userAccount);
+        Matcher matcher = Pattern.compile(UserConstant.REGEX).matcher(userAccount);
         if (matcher.find()) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         //校验密码是否输入正确，要和数据库中的密文密码去对比
         String encryptPassword = DigestUtils.md5DigestAsHex((UserConstant.SALT + userPassword).getBytes(StandardCharsets.UTF_8));
@@ -104,7 +118,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User user = userMapper.selectOne(wrapper);
         if (user == null) {
             log.info("Login failed, username and password do not match");
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         //3. 用户信息脱敏，隐藏敏感信息，防止数据库中的字段泄露
         User safetyUser = safetyUser(user);
@@ -123,7 +137,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Override
     public User safetyUser(User user) {
         if (user == null) {
-            return null;
+            throw new BusinessException(ErrorCodeEnum.PARAMS_ERROR);
         }
         User safetyUser = new User();
         safetyUser.setId(user.getId());
@@ -135,8 +149,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setEmail(user.getEmail());
         safetyUser.setAvatarUrl(user.getAvatarUrl());
         safetyUser.setUserStatus(user.getUserStatus());
+        safetyUser.setPlanetCode(user.getPlanetCode());
         safetyUser.setCreateTime(user.getCreateTime());
         return safetyUser;
+    }
+
+    @Override
+    public int userLogout(HttpServletRequest request) {
+        //移除登录态信息
+        request.getSession().removeAttribute(SESSION_KEY);
+        return 1;
     }
 }
 

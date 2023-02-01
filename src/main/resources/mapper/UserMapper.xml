@@ -15,6 +15,7 @@
         <result property="email" column="email" jdbcType="VARCHAR"/>
         <result property="avatarUrl" column="avatarUrl" jdbcType="VARCHAR"/>
         <result property="userStatus" column="userStatus" jdbcType="INTEGER"/>
+        <result property="planetCode" column="planetCode" jdbcType="VARCHAR"/>
         <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
         <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
@@ -23,7 +24,7 @@
     <sql id="Base_Column_List">
         id,username,userAccount,
         userPassword,gender,phoneNumber,userRole,
-        email,avatarUrl,userStatus,
+        email,avatarUrl,userStatus,planetCode,
         createTime,updateTime,isDelete
     </sql>
 </mapper>
